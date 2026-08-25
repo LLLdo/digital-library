@@ -1,0 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: #f7f7f3;
+  color: #17211b;
+  font-family: "Noto Sans Thai", system-ui, sans-serif;
+}
+button, input, textarea, select { font: inherit; }
+.reader-page canvas { max-width: 100%; height: auto !important; }
