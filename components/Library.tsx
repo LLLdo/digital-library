@@ -6,6 +6,11 @@ import { supabase } from "@/lib/supabase";
 import type { Book } from "@/lib/types";
 import BookCard from "./BookCard";
 
+// ปรับ 3 ค่านี้ได้ถ้าการ์ดหนังสือสูง/เตี้ยกว่านี้
+const SHELF_H = 300;       // ความสูงของแต่ละชั้น (px)
+const SHELF_GAP = 56;      // ระยะห่างระหว่างชั้น รวมพื้นที่แผ่นชั้น (px)
+const PLANK_THICKNESS = 14; // ความหนาของแผ่นชั้น (px)
+
 export default function Library() {
   const [books, setBooks] = useState<Book[]>([]);
   const [query, setQuery] = useState("");
@@ -24,6 +29,24 @@ export default function Library() {
     const hit = !q || [b.title_th, b.title_en, b.author, b.category].some(v => v?.toLowerCase().includes(q));
     return hit && (category === "ทั้งหมด" || b.category === category);
   });
+
+  const shelfBackground = {
+    backgroundImage: `repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent ${SHELF_H}px,
+      rgba(0,0,0,0.05) ${SHELF_H}px,
+      rgba(0,0,0,0.05) ${SHELF_H + 2}px,
+      #e5dbca ${SHELF_H + 2}px,
+      #e5dbca ${SHELF_H + PLANK_THICKNESS}px,
+      rgba(0,0,0,0.14) ${SHELF_H + PLANK_THICKNESS}px,
+      rgba(0,0,0,0.14) ${SHELF_H + PLANK_THICKNESS + 3}px,
+      transparent ${SHELF_H + PLANK_THICKNESS + 3}px,
+      transparent ${SHELF_H + SHELF_GAP}px
+    )`,
+    backgroundSize: `100% ${SHELF_H + SHELF_GAP}px`,
+    backgroundRepeat: "repeat-y" as const,
+  };
 
   return (
     <main>
@@ -53,7 +76,17 @@ export default function Library() {
 
         {loading ? <div className="py-20 text-center text-black/45">กำลังโหลดหนังสือ...</div> :
           filtered.length === 0 ? <div className="rounded-3xl bg-white p-12 text-center text-black/45">ยังไม่มีหนังสือที่ตรงกับการค้นหา</div> :
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 lg:gap-6">{filtered.map(b => <BookCard key={b.id} book={b} />)}</div>}
+          <div
+            style={shelfBackground}
+            className="grid grid-cols-2 gap-x-4 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-6"
+          >
+            {filtered.map(b => (
+              <div key={b.id} className="flex items-end justify-center pb-1 transition-transform duration-200 hover:-translate-y-1">
+                <BookCard book={b} />
+              </div>
+            ))}
+          </div>
+        }
       </section>
     </main>
   );
