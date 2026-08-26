@@ -65,7 +65,7 @@ export default function Library() {
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-mint px-3 py-1.5 text-sm text-forest">
             <Sparkles size={15} /> Modern digital library
           </div>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">อ่านหนังสือได้ทุกที่<br /><span className="text-forest">ใน KU Digital Library</span></h1>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">อ่านหนังสือได้ทุกที่<br /><span className="text-forest">ใน LLLdo KU Digital Library</span></h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-black/55 sm:text-lg">
             ค้นหาและเปิดอ่านหนังสือดิจิทัลได้ง่ายบนคอมพิวเตอร์ iPad และมือถือ
           </p>
