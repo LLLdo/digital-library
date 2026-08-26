@@ -8,18 +8,19 @@ import type { Book } from "@/lib/types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-const SPREAD_MIN_WIDTH = 900; // ต่ำกว่านี้จะ fallback เป็นหน้าเดี่ยว
-const FLIP_MS = 260;
+const SPREAD_MIN_WIDTH = 900;   // จอแคบกว่านี้ fallback เป็นหน้าเดี่ยว
+const SPREAD_MAX_WIDTH = 860;   // ความกว้างรวมสูงสุดตอนโชว์ 2 หน้า (เดิม 1400 ใหญ่ไป)
+const SINGLE_MAX_WIDTH = 460;   // ความกว้างสูงสุดตอนโชว์หน้าเดียว/ปก
+const FLIP_MS = 180;
 
 export default function PdfReader({ book }: { book: Book }) {
   const [pages, setPages] = useState(0);
-  const [page, setPage] = useState(1); // หน้าซ้ายของคู่ที่กำลังแสดง (หรือหน้าเดี่ยวถ้าจอแคบ)
+  const [page, setPage] = useState(1);
   const [scale, setScale] = useState(1);
-  const [containerWidth, setContainerWidth] = useState(780);
+  const [windowWidth, setWindowWidth] = useState(1200);
   const [isSpread, setIsSpread] = useState(true);
   const [flip, setFlip] = useState<"next" | "prev" | null>(null);
 
-  // คำนวณ URL แค่ครั้งเดียวต่อเล่ม ไม่ต้อง re-compute ทุก render (กันตัว Document โหลดซ้ำ/กระตุก)
   const url = useMemo(
     () => supabase.storage.from("pdfs").getPublicUrl(book.pdf_path).data.publicUrl,
     [book.pdf_path]
@@ -31,7 +32,7 @@ export default function PdfReader({ book }: { book: Book }) {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const w = window.innerWidth;
-        setContainerWidth(Math.min(w - 32, 1400));
+        setWindowWidth(w);
         setIsSpread(w >= SPREAD_MIN_WIDTH);
       });
     };
@@ -47,14 +48,13 @@ export default function PdfReader({ book }: { book: Book }) {
 
   useEffect(() => { localStorage.setItem(`ku-book-page-${book.id}`, String(page)); }, [book.id, page]);
 
-  // หน้าปก (หน้า 1) โชว์เดี่ยวเสมอ จากนั้นจับคู่ 2-3, 4-5, ...
   const isCoverPage = page === 1;
   const showTwoPages = isSpread && !isCoverPage && page < pages;
   const rightPage = showTwoPages ? page + 1 : null;
 
-  const pageWidth = showTwoPages
-    ? (containerWidth * scale) / 2 - 8
-    : containerWidth * scale;
+  // ขนาดพอดีจอ ไม่ใหญ่เกินไป — คุมด้วย max width ที่เล็กลงตามโหมด
+  const available = Math.min(windowWidth - 48, showTwoPages ? SPREAD_MAX_WIDTH : SINGLE_MAX_WIDTH);
+  const pageWidth = showTwoPages ? (available * scale) / 2 - 6 : available * scale;
 
   const canGoPrev = page > 1;
   const canGoNext = page < pages;
@@ -104,18 +104,17 @@ export default function PdfReader({ book }: { book: Book }) {
       <button onClick={() => setScale(s => Math.min(1.8, s+.1))} className="rounded-xl p-2 hover:bg-black/5"><Plus size={18}/></button>
       <button onClick={() => document.documentElement.requestFullscreen?.()} className="rounded-xl p-2 hover:bg-black/5"><Maximize2 size={18}/></button>
     </div>
-    <div className="flex justify-center p-4 sm:p-8" style={{ perspective: "2000px" }}>
+    <div className="flex justify-center p-4 sm:p-8">
+      {/* เบากว่าเดิม: ใช้ opacity + translateX แทน 3D rotateY เพื่อลดภาระ GPU ทำให้ลื่นขึ้นจริง */}
       <div
         onClick={onBookClick}
         style={{
           willChange: "transform, opacity",
-          transformStyle: "preserve-3d",
-          transition: `transform ${FLIP_MS}ms cubic-bezier(.4,0,.2,1), opacity ${FLIP_MS}ms ease-out`,
-          transformOrigin: flip === "prev" ? "right center" : "left center",
-          transform: flip
-            ? `rotateY(${flip === "next" ? "-10deg" : "10deg"}) scale(.985)`
-            : "rotateY(0deg) scale(1)",
-          opacity: flip ? 0.55 : 1,
+          transition: `transform ${FLIP_MS}ms ease-out, opacity ${FLIP_MS}ms ease-out`,
+          transform: flip === "next" ? "translateX(-14px) scale(.98)"
+                    : flip === "prev" ? "translateX(14px) scale(.98)"
+                    : "translateX(0) scale(1)",
+          opacity: flip ? 0.5 : 1,
         }}
         className="flex cursor-pointer select-none items-stretch overflow-hidden rounded-xl bg-white shadow-soft"
       >

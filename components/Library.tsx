@@ -7,9 +7,9 @@ import type { Book } from "@/lib/types";
 import BookCard from "./BookCard";
 
 // ปรับ 3 ค่านี้ได้ถ้าการ์ดหนังสือสูง/เตี้ยกว่านี้
-const SHELF_H = 300;       // ความสูงของแต่ละชั้น (px)
-const SHELF_GAP = 56;      // ระยะห่างระหว่างชั้น รวมพื้นที่แผ่นชั้น (px)
-const PLANK_THICKNESS = 14; // ความหนาของแผ่นชั้น (px)
+const SHELF_H = 280;        // ความสูงโซนหนังสือแต่ละชั้น (px)
+const PLANK_THICKNESS = 22; // ความหนาของแผ่นไม้ชั้น (px)
+const SHELF_GAP = 60;       // ระยะห่างรวม (โซนหนังสือถัดไป) ระหว่างชั้น (px)
 
 export default function Library() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -30,21 +30,31 @@ export default function Library() {
     return hit && (category === "ทั้งหมด" || b.category === category);
   });
 
+  const period = SHELF_H + SHELF_GAP;
+  const plankStart = SHELF_H;
+  const plankEnd = SHELF_H + PLANK_THICKNESS;
+
   const shelfBackground = {
     backgroundImage: `repeating-linear-gradient(
       to bottom,
       transparent 0px,
-      transparent ${SHELF_H}px,
-      rgba(0,0,0,0.05) ${SHELF_H}px,
-      rgba(0,0,0,0.05) ${SHELF_H + 2}px,
-      #e5dbca ${SHELF_H + 2}px,
-      #e5dbca ${SHELF_H + PLANK_THICKNESS}px,
-      rgba(0,0,0,0.14) ${SHELF_H + PLANK_THICKNESS}px,
-      rgba(0,0,0,0.14) ${SHELF_H + PLANK_THICKNESS + 3}px,
-      transparent ${SHELF_H + PLANK_THICKNESS + 3}px,
-      transparent ${SHELF_H + SHELF_GAP}px
+      transparent ${plankStart}px,
+      rgba(0,0,0,0.10) ${plankStart}px,
+      rgba(0,0,0,0.10) ${plankStart + 3}px,
+      #f1ddb8 ${plankStart + 3}px,
+      #f1ddb8 ${plankStart + 6}px,
+      #c9975f ${plankStart + 6}px,
+      #b98552 ${plankStart + 10}px,
+      #c9975f ${plankStart + 14}px,
+      #b17c49 ${plankStart + 18}px,
+      #8a6239 ${plankEnd - 3}px,
+      #8a6239 ${plankEnd}px,
+      rgba(0,0,0,0.28) ${plankEnd}px,
+      rgba(0,0,0,0.10) ${plankEnd + 8}px,
+      transparent ${plankEnd + 18}px,
+      transparent ${period}px
     )`,
-    backgroundSize: `100% ${SHELF_H + SHELF_GAP}px`,
+    backgroundSize: `100% ${period}px`,
     backgroundRepeat: "repeat-y" as const,
   };
 
@@ -77,7 +87,7 @@ export default function Library() {
         {loading ? <div className="py-20 text-center text-black/45">กำลังโหลดหนังสือ...</div> :
           filtered.length === 0 ? <div className="rounded-3xl bg-white p-12 text-center text-black/45">ยังไม่มีหนังสือที่ตรงกับการค้นหา</div> :
           <div
-            style={shelfBackground}
+            style={{ ...shelfBackground, paddingBottom: `${PLANK_THICKNESS + 20}px` }}
             className="grid grid-cols-2 gap-x-4 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-6"
           >
             {filtered.map(b => (
