@@ -10,16 +10,28 @@ import type { Book } from "@/lib/types";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 // react-pageflip มาพร้อม type ที่บังคับ props เกินจริง (ไม่มีค่า default ให้)
-// แปลงเป็น any ตรงนี้เพื่อไม่ให้ TypeScript ฟ้อง error ตอน build
 const FlipBook = HTMLFlipBook as any;
 
-const PAGE_MAX_WIDTH = 460;   // ความกว้างสูงสุดของหนึ่งหน้า (px)
-const RENDER_WINDOW = 2;      // render จริงเฉพาะหน้าที่อยู่ใกล้หน้าปัจจุบัน ที่เหลือเป็น placeholder (กันหน่วง)
+const SPREAD_MIN_WIDTH = 900;     // จอกว้างกว่านี้ = โหมดคู่, แคบกว่า = หน้าเดี่ยว
+const PAGE_MAX_WIDTH = 460;       // ความกว้างสูงสุดต่อหนึ่งหน้า
+const RENDER_WINDOW_PAGES = 4;    // render จริงเฉพาะหน้า pdf ที่อยู่ใกล้หน้าปัจจุบัน กันหน่วง
+
+// จับคู่เลขหน้า pdf เอง: หน้าปก (1) อยู่เดี่ยว จากนั้นจับคู่ 2-3, 4-5, ... (เฉพาะตอนโหมดคู่)
+function buildGroups(totalPages: number, spread: boolean): number[][] {
+  if (totalPages <= 0) return [];
+  if (!spread) return Array.from({ length: totalPages }, (_, i) => [i + 1]);
+  const groups: number[][] = [[1]];
+  for (let p = 2; p <= totalPages; p += 2) {
+    groups.push(p + 1 <= totalPages ? [p, p + 1] : [p]);
+  }
+  return groups;
+}
 
 export default function PdfReader({ book }: { book: Book }) {
   const [numPages, setNumPages] = useState(0);
-  const [currentPage, setCurrentPage] = useState(0); // 0-based index จาก react-pageflip
-  const [pageWidth, setPageWidth] = useState(380);
+  const [currentGroup, setCurrentGroup] = useState(0);
+  const [windowWidth, setWindowWidth] = useState(1200);
+  const [isSpread, setIsSpread] = useState(true);
   const [zoom, setZoom] = useState(1);
   const flipBookRef = useRef<any>(null);
 
@@ -29,37 +41,50 @@ export default function PdfReader({ book }: { book: Book }) {
   );
 
   useEffect(() => {
-    // เผื่อความกว้างของ padding รอบตัว ให้พอดีจอมือถือจริงๆ ไม่ล้น
-    const onResize = () => setPageWidth(Math.min(window.innerWidth - 40, PAGE_MAX_WIDTH));
+    const onResize = () => {
+      const w = window.innerWidth;
+      setWindowWidth(w);
+      setIsSpread(w >= SPREAD_MIN_WIDTH);
+    };
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  const groups = useMemo(() => buildGroups(numPages, isSpread), [numPages, isSpread]);
+
+  const singlePageWidth = isSpread
+    ? Math.min((windowWidth - 64) / 2, PAGE_MAX_WIDTH)
+    : Math.min(windowWidth - 40, PAGE_MAX_WIDTH);
+  const singlePageHeight = Math.round(singlePageWidth * 1.41);
+  const unitWidth = isSpread ? singlePageWidth * 2 : singlePageWidth;
+
+  // กลับไปหน้าที่ค้างไว้ — เก็บเป็นเลขหน้า pdf จริง (ไม่ใช่ index กลุ่ม เพราะกลุ่มเปลี่ยนไปตามโหมดจอ)
   useEffect(() => {
-    if (numPages > 0) {
-      const saved = Number(localStorage.getItem(`ku-book-page-${book.id}`));
-      if (saved > 0) {
-        setTimeout(() => flipBookRef.current?.pageFlip()?.turnToPage(saved), 50);
-      }
-    }
-  }, [book.id, numPages]);
+    if (groups.length === 0) return;
+    const saved = Number(localStorage.getItem(`ku-book-page-${book.id}`));
+    const targetGroupIndex = saved > 0 ? Math.max(0, groups.findIndex(g => g.includes(saved))) : 0;
+    const t = setTimeout(() => flipBookRef.current?.pageFlip()?.turnToPage(targetGroupIndex), 60);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups.length, isSpread, book.id]);
 
   const goPrev = () => flipBookRef.current?.pageFlip()?.flipPrev();
   const goNext = () => flipBookRef.current?.pageFlip()?.flipNext();
 
   const onFlip = (e: { data: number }) => {
-    setCurrentPage(e.data);
-    localStorage.setItem(`ku-book-page-${book.id}`, String(e.data));
+    setCurrentGroup(e.data);
+    const firstPageOfGroup = groups[e.data]?.[0];
+    if (firstPageOfGroup) localStorage.setItem(`ku-book-page-${book.id}`, String(firstPageOfGroup));
   };
-
-  const pageHeight = Math.round(pageWidth * 1.41);
 
   return <div className="reader-page min-h-[calc(100vh-73px)] bg-[#e9e9e5]">
     <div className="sticky top-[73px] z-30 flex flex-wrap items-center justify-center gap-2 border-b border-black/5 bg-white/90 p-3 backdrop-blur">
-      <button disabled={currentPage <= 0} onClick={goPrev} className="rounded-xl p-2 hover:bg-black/5 disabled:opacity-30"><ChevronLeft/></button>
-      <span className="min-w-24 text-center text-sm">{currentPage + 1} / {numPages || "…"}</span>
-      <button disabled={currentPage >= numPages - 1} onClick={goNext} className="rounded-xl p-2 hover:bg-black/5 disabled:opacity-30"><ChevronRight/></button>
+      <button disabled={currentGroup <= 0} onClick={goPrev} className="rounded-xl p-2 hover:bg-black/5 disabled:opacity-30"><ChevronLeft/></button>
+      <span className="min-w-24 text-center text-sm">
+        {groups[currentGroup]?.join("-") ?? "…"} / {numPages || "…"}
+      </span>
+      <button disabled={currentGroup >= groups.length - 1} onClick={goNext} className="rounded-xl p-2 hover:bg-black/5 disabled:opacity-30"><ChevronRight/></button>
       <span className="mx-2 h-6 w-px bg-black/10"/>
       <button onClick={() => setZoom(z => Math.max(.6, +(z - .1).toFixed(2)))} className="rounded-xl p-2 hover:bg-black/5"><Minus size={18}/></button>
       <span className="min-w-12 text-center text-sm">{Math.round(zoom * 100)}%</span>
@@ -76,11 +101,12 @@ export default function PdfReader({ book }: { book: Book }) {
           loading={<div className="p-20 text-black/45">กำลังเปิดหนังสือ...</div>}
           error={<div className="p-20 text-red-600">ไม่สามารถเปิด PDF ได้</div>}
         >
-          {numPages > 0 && (
+          {groups.length > 0 && (
             <FlipBook
+              key={`${isSpread ? "spread" : "single"}-${numPages}`}
               ref={flipBookRef}
-              width={pageWidth}
-              height={pageHeight}
+              width={unitWidth}
+              height={singlePageHeight}
               size="fixed"
               minWidth={200}
               maxWidth={1400}
@@ -91,24 +117,26 @@ export default function PdfReader({ book }: { book: Book }) {
               className="shadow-soft"
               startPage={0}
               drawShadow={true}
-              flippingTime={550}
-              usePortrait={true}
+              flippingTime={450}
+              usePortrait={false}
               maxShadowOpacity={0.5}
               mobileScrollSupport={true}
               style={{}}
             >
-              {Array.from({ length: numPages }).map((_, i) => {
-                const pageNum = i + 1;
-                const shouldRender = Math.abs(pageNum - (currentPage + 1)) <= RENDER_WINDOW;
+              {groups.map((groupPages, gi) => {
+                const nearest = groupPages[0];
+                const shouldRender = Math.abs(nearest - (groups[currentGroup]?.[0] ?? 1)) <= RENDER_WINDOW_PAGES;
                 return (
-                  <div key={pageNum} className="flex items-center justify-center bg-white">
-                    {shouldRender ? (
-                      <Page pageNumber={pageNum} width={pageWidth} renderTextLayer={false} renderAnnotationLayer={false} />
-                    ) : (
-                      <div style={{ width: pageWidth, height: pageHeight }} className="flex items-center justify-center text-xs text-black/20">
-                        หน้า {pageNum}
-                      </div>
-                    )}
+                  <div key={gi} className="flex items-stretch justify-center bg-white">
+                    {groupPages.map(pn => (
+                      shouldRender ? (
+                        <Page key={pn} pageNumber={pn} width={singlePageWidth} renderTextLayer={false} renderAnnotationLayer={false}/>
+                      ) : (
+                        <div key={pn} style={{ width: singlePageWidth, height: singlePageHeight }} className="flex items-center justify-center text-xs text-black/20">
+                          หน้า {pn}
+                        </div>
+                      )
+                    ))}
                   </div>
                 );
               })}
