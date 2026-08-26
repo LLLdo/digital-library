@@ -83,9 +83,9 @@ export default function PdfReader({ book }: { book: Book }) {
               height={pageHeight}
               size="fixed"
               minWidth={200}
-              maxWidth={600}
+              maxWidth={1400}
               minHeight={280}
-              maxHeight={900}
+              maxHeight={1600}
               showCover={true}
               onFlip={onFlip}
               className="shadow-soft"
