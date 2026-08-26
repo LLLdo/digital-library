@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-// @ts-ignore - react-pageflip ไม่มี type ที่สมบูรณ์แบบในบางเวอร์ชัน
 import HTMLFlipBook from "react-pageflip";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Book } from "@/lib/types";
+
+// react-pageflip มาพร้อม type ที่บังคับ props เกินจริง (ไม่มีค่า default ให้)
+// แปลงเป็น any ตรงนี้เพื่อไม่ให้ TypeScript ฟ้อง error ตอน build
+const FlipBook = HTMLFlipBook as any;
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -67,7 +70,7 @@ export default function PdfReader({ book }: { book: Book }) {
         error={<div className="p-20 text-red-600">ไม่สามารถเปิด PDF ได้</div>}
       >
         {numPages > 0 && (
-          <HTMLFlipBook
+          <FlipBook
             ref={flipBookRef}
             width={pageWidth}
             height={pageHeight}
@@ -102,7 +105,7 @@ export default function PdfReader({ book }: { book: Book }) {
                 </div>
               );
             })}
-          </HTMLFlipBook>
+          </FlipBook>
         )}
       </Document>
     </div>
